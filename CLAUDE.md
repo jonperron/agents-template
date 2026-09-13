@@ -58,4 +58,81 @@ Store all decisions in the openwiki instance. This includes every time you devia
 
 Whenever you add, remove, or change an API endpoint, its query/path parameters, or a response schema, update api/openapi.yaml in the same change. The file is maintained by hand (curated, simplified operationIds); mirror the style of the existing paths and component schemas, and keep the enums (e.g. Source, MeasureSource) consistent with api/api/schemas.py. A code change to the API contract without the matching api/openapi.yaml update is incomplete.
 
-## Coding Rules
+## Mandatory Subagent Review Workflow
+
+For any non-trivial change, run four separate subagent passes before finalizing.
+
+Each agent tool defines these four roles in its own format. Do not hardcode one
+tool's paths here — this section defines the passes, and each tool maps them:
+
+- GitHub: `.github/agents/*.agent.md`, invoked as `@Lint Agent <prompt>`.
+- Claude Code: `.claude/agents/*.md`, mapped in `CLAUDE.md`.
+
+1. Lint pass (static checks and formatting safety)
+
+- Goal: detect/fix lint and static-analysis issues without changing behavior.
+- Expected output: files changed, checks run, results, and any residual lint debt.
+
+Recommended prompt template:
+
+```text
+Run a lint/static-check pass in medium mode.
+Focus on minimal, behavior-preserving fixes and report changed files,
+executed checks, and remaining lint/type debt.
+```
+
+1. Test pass (coverage and reliability)
+
+- Goal: ensure tests are added/updated and quality gates are executed for touched scope.
+- Expected output: tests added/updated, commands executed, failures, and coverage gaps.
+
+Recommended prompt template:
+
+```text
+Run a test pass in medium mode.
+Focus on missing/updated tests for changed behavior and report executed test commands,
+failures with root-cause hypotheses, and remaining coverage gaps.
+```
+
+1. Review pass (behavior and regressions)
+
+- Goal: find functional bugs, regressions, API contract breaks, and missing tests.
+- Expected output: prioritized findings with file paths, risk level, and proposed fixes.
+
+Recommended prompt template:
+
+```text
+Review this change set in medium/thorough mode.
+Focus on behavior regressions, edge cases, API/schema compatibility, and missing tests.
+Return findings ordered by severity with concrete file references and fix suggestions.
+```
+
+1. Security pass (privacy and boundaries)
+
+- Goal: detect confidentiality leaks, unsafe error handling, weak input validation, and boundary violations.
+- Expected output: security findings with impact, mitigation, and a CWE (Common
+  Weakness Enumeration) identifier where the finding maps to a known weakness
+  class. Omit the identifier rather than guessing one.
+
+Recommended prompt template:
+
+```text
+Perform a security review of this change set in thorough mode.
+Focus on patient data exposure, secret handling, input validation,
+external data egress, and production config boundaries.
+Return only actionable findings with severity, affected files, and remediation steps.
+```
+
+Required merge condition:
+
+- Lint pass completed with no unresolved high-impact lint/type issues.
+- Test pass completed with relevant tests/checks executed for touched scope.
+- No unresolved high-severity review or security findings.
+- If findings exist, either fix them or document an explicit risk acceptance.
+
+Invocation examples:
+
+- `@Lint Agent Run a lint/static-check pass in medium mode. Keep fixes minimal and behavior-preserving.`
+- `@Test Agent Run a test pass in medium mode. Focus on missing tests and execute relevant quality gates.`
+- `@Review Agent Review this change set in medium mode. Focus on behavior regressions, API compatibility, and missing tests.`
+- `@Security Agent Perform a thorough security review focused on patient data exposure, input validation, and external data egress.`
